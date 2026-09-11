@@ -10,27 +10,47 @@ A local Herdr plugin that shows the active pane in the tab bar and labels unlabe
 
 Clicking the tab-bar status area cannot copy the ID. Herdr does not expose a mouse hit target or click handler for `tab_bar_right`; that would require a Herdr core change. Use the plugin action instead.
 
+`herdr plugin list` prints a `config:` path. That is the plugin's user config directory. It does not contain `plugin.py`. The source directory is `plugin_root` from `herdr plugin list --json`. Use `plugin_root` in `tab_bar_right`.
+
 ## Install from GitHub
 
 ```bash
-herdr plugin install elonnzhang/herdr-plugin-tab-tips
+herdr plugin install elonnzhang/herdr-plugin-tab-tips --yes
 ```
 
-Herdr clones the repo, validates `herdr-plugin.toml`, and registers the plugin. Use `--yes` for a noninteractive install.
+Verified install output:
 
-Then print the installed plugin source directory. The `config:` line from `herdr plugin list` is the plugin's user config directory; it does not contain `plugin.py` and must not be used in `tab_bar_right`. The source directory is `plugin_root` in JSON:
+```text
+Installed local.herdr-plugin-tab-tips from elonnzhang/herdr-plugin-tab-tips.
+Config: ~/.config/herdr/plugins/config/local.herdr-plugin-tab-tips
+```
+
+Human list:
+
+```text
+- local.herdr-plugin-tab-tips (Herdr Tab Tips) enabled [github:elonnzhang/herdr-plugin-tab-tips@<commit>]
+  config: ~/.config/herdr/plugins/config/local.herdr-plugin-tab-tips
+```
+
+JSON `plugin_root` looks like:
+
+```text
+~/.config/herdr/plugins/github/local.herdr-plugin-tab-tips-<hash>
+```
+
+Print it:
 
 ```bash
-herdr plugin list --json
+herdr plugin list --plugin local.herdr-plugin-tab-tips --json
 ```
 
-Find `local.herdr-plugin-tab-tips` and copy its `plugin_root`. Merge that directory's `config.toml.example` into `~/.config/herdr/config.toml`, replacing `/path/to/herdr-plugin-tab-tips` with `plugin_root`. Reload:
+Copy `plugin.py` and `config.toml.example` from that `plugin_root`. Merge the example into `~/.config/herdr/config.toml`, replacing `/path/to/herdr-plugin-tab-tips` with `plugin_root`. Reload:
 
 ```bash
 herdr server reload-config
 ```
 
-Reinstall from GitHub to refresh a managed checkout:
+Refresh a GitHub-managed checkout:
 
 ```bash
 herdr plugin install elonnzhang/herdr-plugin-tab-tips --yes
@@ -42,7 +62,14 @@ herdr plugin install elonnzhang/herdr-plugin-tab-tips --yes
 herdr plugin link /path/to/herdr-plugin-tab-tips
 ```
 
-Merge `config.toml.example` into `~/.config/herdr/config.toml`, replacing `/path/to/herdr-plugin-tab-tips` with the checkout path, then reload:
+Verified human list:
+
+```text
+- local.herdr-plugin-tab-tips (Herdr Tab Tips) enabled [local:/path/to/herdr-plugin-tab-tips]
+  config: ~/.config/herdr/plugins/config/local.herdr-plugin-tab-tips
+```
+
+JSON `plugin_root` is the checkout path. Merge `config.toml.example` into `~/.config/herdr/config.toml`, replacing `/path/to/herdr-plugin-tab-tips` with that checkout path, then reload:
 
 ```bash
 herdr server reload-config
