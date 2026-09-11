@@ -1,9 +1,6 @@
-# Merge these settings into ~/.config/herdr/config.toml.
-# Herdr Tab Tips cannot modify host UI configuration through the plugin API.
-# After `herdr plugin install elonnzhang/herdr-plugin-tab-tips`, replace
-# `/path/to/herdr-plugin-tab-tips` with plugin_root from:
+# Merge into ~/.config/herdr/config.toml.
+# Replace /path/to/herdr-plugin-tab-tips with plugin_root from:
 #   herdr plugin list --plugin local.herdr-plugin-tab-tips --json
-# Do not use the `config:` path from `herdr plugin list`; that directory has no plugin.py.
 
 [ui]
 pane_borders = "always"
