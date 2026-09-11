@@ -6,6 +6,8 @@ Shows the active pane in the tab bar, labels unlabeled panes, and copies the act
 
 `tab_bar_right` needs the plugin source directory (`plugin_root`), not the `config:` path from `herdr plugin list`.
 
+![图示](img/image.png)
+
 ## GitHub
 
 ```bash

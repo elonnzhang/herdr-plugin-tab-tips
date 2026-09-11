@@ -4,6 +4,8 @@
 
 `tab_bar_right` 要用源码目录 `plugin_root`，不要用 `herdr plugin list` 里的 `config:`。
 
+![图示](img/image.png)
+
 ## GitHub 安装
 
 ```bash
