@@ -16,13 +16,13 @@ herdr plugin install elonnzhang/herdr-plugin-tab-tips
 
 Herdr 会克隆仓库、校验 `herdr-plugin.toml` 并注册插件。非交互安装可以加 `--yes`。
 
-然后查看已安装插件的根目录：
+然后查看已安装插件的源码目录。普通 `herdr plugin list` 里的 `config:` 是插件自己的配置目录，里面没有 `plugin.py`，不能拿来填 `tab_bar_right`。源码目录在 JSON 的 `plugin_root`：
 
 ```bash
-herdr plugin list
+herdr plugin list --json
 ```
 
-`local.herdr-plugin-tab-tips` 这一项里有 `plugin_root`。把 `config.toml.example` 合并进 `~/.config/herdr/config.toml`，把 `/path/to/herdr-plugin-tab-tips` 换成这个 `plugin_root`，然后重新加载：
+找到 `local.herdr-plugin-tab-tips` 的 `plugin_root`。把这个目录下的 `config.toml.example` 合并进 `~/.config/herdr/config.toml`，把示例里的 `/path/to/herdr-plugin-tab-tips` 换成这个 `plugin_root`，然后重新加载：
 
 ```bash
 herdr server reload-config
@@ -64,7 +64,7 @@ command = "local.herdr-plugin-tab-tips.copy-pane-id"
 description = "copy active pane ID"
 ```
 
-GitHub 安装后，把上面的 `/path/to/herdr-plugin-tab-tips` 换成 `herdr plugin list` 给出的 `plugin_root`。
+GitHub 安装后，把上面的 `/path/to/herdr-plugin-tab-tips` 换成 `herdr plugin list --json` 给出的 `plugin_root`。
 
 默认 prefix 是 `ctrl+b`。因此 `prefix+y` 的按法是：先按 `Ctrl+B`，再按 `y`。
 

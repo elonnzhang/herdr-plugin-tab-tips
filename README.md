@@ -18,13 +18,13 @@ herdr plugin install elonnzhang/herdr-plugin-tab-tips
 
 Herdr clones the repo, validates `herdr-plugin.toml`, and registers the plugin. Use `--yes` for a noninteractive install.
 
-Then print the installed plugin root:
+Then print the installed plugin source directory. The `config:` line from `herdr plugin list` is the plugin's user config directory; it does not contain `plugin.py` and must not be used in `tab_bar_right`. The source directory is `plugin_root` in JSON:
 
 ```bash
-herdr plugin list
+herdr plugin list --json
 ```
 
-The `local.herdr-plugin-tab-tips` entry includes a `plugin_root` path. Merge `config.toml.example` into `~/.config/herdr/config.toml`, replacing `/path/to/herdr-plugin-tab-tips` with that `plugin_root`. Reload:
+Find `local.herdr-plugin-tab-tips` and copy its `plugin_root`. Merge that directory's `config.toml.example` into `~/.config/herdr/config.toml`, replacing `/path/to/herdr-plugin-tab-tips` with `plugin_root`. Reload:
 
 ```bash
 herdr server reload-config
