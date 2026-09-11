@@ -1,0 +1,18 @@
+# Merge these settings into ~/.config/herdr/config.toml.
+# Herdr Tab Tips cannot modify host UI configuration through the plugin API.
+# After `herdr plugin install elonnzhang/herdr-plugin-tab-tips`, replace
+# `/path/to/herdr-plugin-tab-tips` with the plugin_root from `herdr plugin list`.
+
+[ui]
+pane_borders = "always"
+pane_outer_borders = true
+tab_bar_right = [
+  { type = "command", command = "python3 /path/to/herdr-plugin-tab-tips/plugin.py status", interval_seconds = 1, timeout_seconds = 2 },
+]
+tab_bar_right_separator = " · "
+
+[[keys.command]]
+key = "prefix+y"
+type = "plugin_action"
+command = "local.herdr-plugin-tab-tips.copy-pane-id"
+description = "copy active pane ID"
