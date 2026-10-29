@@ -1,59 +1,99 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """Herdr Tab Tips plugin entrypoint.
 
 Event hooks are short-lived. The tab-bar status command prints one compact
 line. The copy-id action writes the active pane public id to the clipboard.
+
+Portable across Python 2.7 and 3.6+ so it also runs on older dev machines.
 """
 
-from __future__ import annotations
-
+import collections
 import json
 import os
 import re
 import subprocess
 import sys
-from pathlib import Path
+import threading
+
+PY2 = sys.version_info[0] == 2
+text_type = unicode if PY2 else str  # noqa: F821
 
 MAX_LABEL_LENGTH = 48
-CONTROL_RE = re.compile(r"[\x00-\x1f\x7f\x80-\x9f]")
+CONTROL_RE = re.compile(u"[\x00-\x1f\x7f\x80-\x9f]")
+SEP = u" \u00b7 "
+Result = collections.namedtuple("Result", "returncode stdout stderr")
 
 
-def herdr_binary() -> str:
+def to_text(value):
+    if value is None:
+        return u""
+    if isinstance(value, text_type):
+        return value
+    if isinstance(value, bytes):
+        return value.decode("utf-8", "replace")
+    return text_type(value)
+
+
+def write(text, stream=None):
+    stream = stream or sys.stdout
+    getattr(stream, "buffer", stream).write(to_text(text).encode("utf-8"))
+    stream.flush()
+
+
+def run_argv(argv, stdin=None, timeout=2.0):
+    """Run argv, return Result or None. Args are passed as UTF-8 bytes."""
+    try:
+        proc = subprocess.Popen(
+            [to_text(a).encode("utf-8") for a in argv],
+            stdin=subprocess.PIPE if stdin is not None else None,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except OSError:
+        return None
+    timer = threading.Timer(timeout, proc.kill)
+    timer.daemon = True
+    timer.start()
+    try:
+        data = to_text(stdin).encode("utf-8") if stdin is not None else None
+        out, err = proc.communicate(data)
+    except Exception:
+        return None
+    finally:
+        timer.cancel()
+    return Result(proc.returncode, to_text(out), to_text(err))
+
+
+def herdr_binary():
     return os.environ.get("HERDR_BIN_PATH") or "herdr"
 
 
-def context() -> dict:
+def context():
     try:
-        value = json.loads(os.environ.get("HERDR_PLUGIN_CONTEXT_JSON", "{}"))
-    except json.JSONDecodeError:
+        value = json.loads(to_text(os.environ.get("HERDR_PLUGIN_CONTEXT_JSON", "{}")))
+    except ValueError:
         return {}
     return value if isinstance(value, dict) else {}
 
 
-def clean(value: object, limit: int = MAX_LABEL_LENGTH) -> str:
-    text = CONTROL_RE.sub("", str(value or ""))
-    text = " ".join(text.split()).strip()
-    return text[:limit]
+def clean(value, limit=MAX_LABEL_LENGTH):
+    text = CONTROL_RE.sub(u"", to_text(value or u""))
+    return u" ".join(text.split()).strip()[:limit]
 
 
-def run_herdr(*args: str, timeout: float = 2.0) -> dict:
-    try:
-        result = subprocess.run(
-            [herdr_binary(), *args],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            check=False,
-        )
-        if result.returncode != 0:
-            return {}
-        value = json.loads(result.stdout)
-        return value if isinstance(value, dict) else {}
-    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+def run_herdr(*args):
+    result = run_argv([herdr_binary()] + list(args))
+    if result is None or result.returncode != 0:
         return {}
+    try:
+        value = json.loads(result.stdout)
+    except ValueError:
+        return {}
+    return value if isinstance(value, dict) else {}
 
 
-def current_pane_id() -> str:
+def current_pane_id():
     data = context()
     return clean(
         data.get("focused_pane_id")
@@ -62,14 +102,14 @@ def current_pane_id() -> str:
     )
 
 
-def pane_info(pane_id: str) -> dict:
+def pane_info(pane_id):
     if not pane_id:
         return {}
     pane = run_herdr("pane", "get", pane_id).get("result", {}).get("pane", {})
     return pane if isinstance(pane, dict) else {}
 
 
-def default_pane_label(pane_id: str, pane: dict) -> str:
+def default_pane_label(pane_id, pane):
     existing = clean(pane.get("label"))
     if existing:
         return existing
@@ -78,13 +118,13 @@ def default_pane_label(pane_id: str, pane: dict) -> str:
         return title
     cwd = clean(pane.get("cwd"))
     if cwd:
-        name = clean(Path(cwd).name)
-        if name and name != "/":
+        name = clean(os.path.basename(cwd.rstrip(u"/")))
+        if name and name != u"/":
             return name
     return pane_id
 
 
-def ensure_pane_label() -> None:
+def ensure_pane_label():
     pane_id = current_pane_id()
     if not pane_id:
         return
@@ -92,58 +132,38 @@ def ensure_pane_label() -> None:
     label = default_pane_label(pane_id, pane)
     if not label or clean(pane.get("label")) == label:
         return
-    subprocess.run(
-        [herdr_binary(), "pane", "rename", pane_id, label],
-        capture_output=True,
-        text=True,
-        timeout=2,
-        check=False,
-    )
+    run_argv([herdr_binary(), "pane", "rename", pane_id, label])
 
 
-def print_active_pane() -> None:
+def print_active_pane():
     pane_id = clean(os.environ.get("HERDR_ACTIVE_PANE_ID"))
     if not pane_id:
         return
-    pane = pane_info(pane_id)
-    label = clean(pane.get("label"))
-    print(f"{label} · {pane_id}" if label else pane_id, end="")
+    label = clean(pane_info(pane_id).get("label"))
+    write(label + SEP + pane_id if label else pane_id)
 
 
-def applescript_string(text: str) -> str:
-    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+def applescript_string(text):
+    return u'"' + text.replace(u"\\", u"\\\\").replace(u'"', u'\\"') + u'"'
 
 
-def run_argv(argv: list[str], stdin: str | None = None, timeout: float = 2.0) -> subprocess.CompletedProcess[str] | None:
-    try:
-        return subprocess.run(
-            argv,
-            input=stdin,
-            text=True,
-            timeout=timeout,
-            check=False,
-            capture_output=True,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-
-
-def copy_macos_clipboard(text: str) -> bool:
+def copy_macos_clipboard(text):
     quoted = applescript_string(text)
     # Server-spawned pbcopy can exit 0 without updating the GUI pasteboard that
     # Cmd+V reads. osascript talks to the user session pasteboard directly.
     attempts = (
-        ["osascript", "-e", f"set the clipboard to {quoted}"],
+        ["osascript", "-e", u"set the clipboard to " + quoted],
         [
             "osascript",
             "-e",
-            "use framework \"AppKit\"",
+            'use framework "AppKit"',
             "-e",
             "set pb to current application's NSPasteboard's generalPasteboard()",
             "-e",
             "pb's clearContents()",
             "-e",
-            f"pb's setString:{quoted} forType:(current application's NSPasteboardTypeString)",
+            u"pb's setString:" + quoted
+            + u" forType:(current application's NSPasteboardTypeString)",
         ],
         ["/usr/bin/pbcopy"],
         ["pbcopy"],
@@ -156,66 +176,51 @@ def copy_macos_clipboard(text: str) -> bool:
     return False
 
 
-def copy_to_clipboard(text: str) -> bool:
+def copy_to_clipboard(text):
     if not text:
         return False
     if sys.platform == "darwin":
         return copy_macos_clipboard(text)
-    for argv in (
-        ["wl-copy"],
-        ["xclip", "-selection", "clipboard"],
-    ):
+    for argv in (["wl-copy"], ["xclip", "-selection", "clipboard"]):
         result = run_argv(argv, stdin=text)
         if result is not None and result.returncode == 0:
             return True
     return False
 
 
-def clipboard_contains(text: str) -> bool:
+def clipboard_contains(text):
     if sys.platform == "darwin":
         result = run_argv(["osascript", "-e", "the clipboard as text"])
-        if result is not None and result.returncode == 0 and result.stdout.rstrip("\n") == text:
+        if result is not None and result.returncode == 0 and result.stdout.rstrip(u"\n") == text:
             return True
         result = run_argv(["pbpaste"])
         return bool(result and result.returncode == 0 and result.stdout == text)
     result = run_argv(["wl-paste", "-n"]) or run_argv(
         ["xclip", "-selection", "clipboard", "-out"]
     )
-    return bool(result and result.returncode == 0 and result.stdout.rstrip("\n") == text)
+    return bool(result and result.returncode == 0 and result.stdout.rstrip(u"\n") == text)
 
 
-def copy_pane_id() -> int:
+def copy_pane_id():
     pane_id = current_pane_id()
     if not pane_id:
         return 1
     copied = copy_to_clipboard(pane_id) and clipboard_contains(pane_id)
-    title = "Copied pane ID" if copied else "Copy pane ID failed"
-    body = pane_id if copied else f"clipboard unchanged · {pane_id}"
-    subprocess.run(
-        [
-            herdr_binary(),
-            "notification",
-            "show",
-            title,
-            "--body",
-            body,
-            "--position",
-            "top-right",
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=2,
+    title = u"Copied pane ID" if copied else u"Copy pane ID failed"
+    body = pane_id if copied else u"clipboard unchanged" + SEP + pane_id
+    run_argv(
+        [herdr_binary(), "notification", "show", title, "--body", body,
+         "--position", "top-right"]
     )
     if copied:
         return 0
-    print(pane_id)
+    write(pane_id + u"\n")
     return 1
 
 
-def main() -> int:
+def main():
     command = sys.argv[1] if len(sys.argv) > 1 else ""
-    if command in {"pane-created", "pane-focused"}:
+    if command in ("pane-created", "pane-focused"):
         ensure_pane_label()
         return 0
     if command == "status":
@@ -223,12 +228,9 @@ def main() -> int:
         return 0
     if command == "copy-id":
         return copy_pane_id()
-    print(
-        "usage: plugin.py {pane-created|pane-focused|status|copy-id}",
-        file=sys.stderr,
-    )
+    write(u"usage: plugin.py {pane-created|pane-focused|status|copy-id}\n", sys.stderr)
     return 2
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(main())

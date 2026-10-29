@@ -9,12 +9,12 @@ platforms = ["linux", "macos"]
 id = "copy-pane-id"
 title = "Copy active pane ID"
 contexts = ["global", "pane"]
-command = ["python3", "plugin.py", "copy-id"]
+command = ["sh", "run.sh", "copy-id"]
 
 [[events]]
 on = "pane.created"
-command = ["python3", "plugin.py", "pane-created"]
+command = ["sh", "run.sh", "pane-created"]
 
 [[events]]
 on = "pane.focused"
-command = ["python3", "plugin.py", "pane-focused"]
+command = ["sh", "run.sh", "pane-focused"]
